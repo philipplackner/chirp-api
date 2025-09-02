@@ -12,6 +12,7 @@ import com.plcoding.chirp.api.dto.ws.OutgoingWebSocketMessageType
 import com.plcoding.chirp.api.dto.ws.ProfilePictureUpdateDto
 import com.plcoding.chirp.api.dto.ws.SendMessageDto
 import com.plcoding.chirp.api.mappers.toChatMessageDto
+import com.plcoding.chirp.domain.event.ChatCreatedEvent
 import com.plcoding.chirp.domain.event.ChatParticipantLeftEvent
 import com.plcoding.chirp.domain.event.ChatParticipantsJoinedEvent
 import com.plcoding.chirp.domain.event.MessageDeletedEvent
@@ -45,7 +46,7 @@ class ChatWebSocketHandler(
     private val objectMapper: ObjectMapper,
     private val chatService: ChatService,
     private val jwtService: JwtService
-): TextWebSocketHandler() {
+) : TextWebSocketHandler() {
 
     companion object {
         private const val PING_INTERVAL_MS = 30_000L
@@ -147,7 +148,7 @@ class ChatWebSocketHandler(
                 message.payload,
                 IncomingWebSocketMessage::class.java
             )
-            when(webSocketMessage.type) {
+            when (webSocketMessage.type) {
                 IncomingWebSocketMessageType.NEW_MESSAGE -> {
                     val dto = objectMapper.readValue(
                         webSocketMessage.payload,
@@ -160,7 +161,7 @@ class ChatWebSocketHandler(
                     )
                 }
             }
-        } catch(e: JsonMappingException) {
+        } catch (e: JsonMappingException) {
             logger.warn("Could not parse message ${message.payload}", e)
             sendError(
                 session = userSession.session,
@@ -188,23 +189,41 @@ class ChatWebSocketHandler(
         )
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun onJoinChat(event: ChatParticipantsJoinedEvent) {
+    private fun updateChatForUsers(
+        chatId: ChatId,
+        userIds: List<UserId>
+    ) {
         connectionLock.write {
-            event.userIds.forEach { userId ->
+            userIds.forEach { userId ->
                 userChatIds.compute(userId) { _, chatIds ->
                     (chatIds ?: mutableSetOf()).apply {
-                        add(event.chatId)
+                        add(chatId)
                     }
                 }
 
                 userToSessions[userId]?.forEach { sessionId ->
-                    chatToSessions.compute(event.chatId) { _, sessions ->
+                    chatToSessions.compute(chatId) { _, sessions ->
                         (sessions ?: mutableSetOf()).apply { add(sessionId) }
                     }
                 }
             }
         }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun onChatCreated(event: ChatCreatedEvent) {
+        updateChatForUsers(
+            chatId = event.chatId,
+            userIds = event.participantIds
+        )
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun onJoinChat(event: ChatParticipantsJoinedEvent) {
+        updateChatForUsers(
+            chatId = event.chatId,
+            userIds = event.userIds.toList()
+        )
 
         broadcastToChat(
             chatId = event.chatId,
@@ -239,9 +258,9 @@ class ChatWebSocketHandler(
 
         sessionsSnapshot.forEach { (sessionId, userSession) ->
             try {
-                if(userSession.session.isOpen) {
+                if (userSession.session.isOpen) {
                     val lastPong = userSession.lastPongTimestamp
-                    if(currentTime - lastPong > PONG_TIMEOUT_MS) {
+                    if (currentTime - lastPong > PONG_TIMEOUT_MS) {
                         logger.warn("Session $sessionId has timed out, closing connection.")
                         sessionsToClose.add(sessionId)
                         return@forEach
@@ -250,7 +269,7 @@ class ChatWebSocketHandler(
                     userSession.session.sendMessage(PingMessage())
                     logger.debug("Sent ping to {}", userSession.userId)
                 }
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 logger.error("Could not ping session $sessionId", e)
                 sessionsToClose.add(sessionId)
             }
@@ -261,7 +280,7 @@ class ChatWebSocketHandler(
                 sessions[sessionId]?.session?.let { session ->
                     try {
                         session.close(CloseStatus.GOING_AWAY.withReason("Ping timeout"))
-                    } catch(e: Exception) {
+                    } catch (e: Exception) {
                         logger.error("Couldn't close sessions for session ${session.id}")
                     }
                 }
@@ -331,10 +350,10 @@ class ChatWebSocketHandler(
                 sessions[sessionId]
             } ?: return@forEach
             try {
-                if(userSession.session.isOpen) {
+                if (userSession.session.isOpen) {
                     userSession.session.sendMessage(TextMessage(messageJson))
                 }
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 logger.error("Could not send profile picture update to session $sessionId", e)
             }
         }
@@ -353,7 +372,7 @@ class ChatWebSocketHandler(
 
         try {
             session.sendMessage(TextMessage(webSocketMessage))
-        } catch(e: Exception) {
+        } catch (e: Exception) {
             logger.warn("Couldn't send error message", e)
         }
     }
@@ -384,7 +403,7 @@ class ChatWebSocketHandler(
     ) {
         val userChatIds = connectionLock.read { this@ChatWebSocketHandler.userChatIds[senderId] } ?: return
 
-        if(dto.chatId !in userChatIds) {
+        if (dto.chatId !in userChatIds) {
             return
         }
 
@@ -414,12 +433,12 @@ class ChatWebSocketHandler(
             val userSession = connectionLock.read {
                 sessions[sessionId] ?: return@forEach
             }
-            if(userSession.session.isOpen) {
+            if (userSession.session.isOpen) {
                 try {
                     val messageJson = objectMapper.writeValueAsString(message)
                     userSession.session.sendMessage(TextMessage(messageJson))
                     logger.debug("Sent message to user {}: {}", userId, messageJson)
-                } catch(e: Exception) {
+                } catch (e: Exception) {
                     logger.error("Error while sending message to $userId", e)
                 }
             }
