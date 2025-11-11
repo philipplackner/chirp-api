@@ -1,6 +1,5 @@
 package com.plcoding.chirp.api.websocket
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.plcoding.chirp.domain.type.ChatId
 import com.plcoding.chirp.domain.type.UserId
 import com.plcoding.chirp.service.ChatMessageService
@@ -12,6 +11,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
+import tools.jackson.databind.ObjectMapper
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.write
