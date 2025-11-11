@@ -75,7 +75,7 @@ class PasswordResetService(
         val hashedNewPassword = passwordEncoder.encode(newPassword)
         userRepository.save(
             user.apply {
-                this.hashedPassword = hashedNewPassword
+                this.hashedPassword = hashedNewPassword!!
             }
         )
 
@@ -110,7 +110,7 @@ class PasswordResetService(
         val newHashedPassword = passwordEncoder.encode(newPassword)
         userRepository.save(
             user.apply {
-                this.hashedPassword = newHashedPassword
+                this.hashedPassword = newHashedPassword!!
             }
         )
     }
