@@ -8,7 +8,7 @@ class PasswordEncoder {
 
     private val bcrypt = BCryptPasswordEncoder()
 
-    fun encode(rawPassword: String): String = bcrypt.encode(rawPassword)
+    fun encode(rawPassword: String): String? = bcrypt.encode(rawPassword)
 
     fun matches(rawPassword: String, hashedPassword: String): Boolean {
         return bcrypt.matches(rawPassword, hashedPassword)
