@@ -48,7 +48,7 @@ class AuthService(
             UserEntity(
                 email = trimmedEmail,
                 username = username.trim(),
-                hashedPassword = passwordEncoder.encode(password)
+                hashedPassword = passwordEncoder.encode(password)!!
             )
         ).toUser()
 
