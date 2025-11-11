@@ -1,13 +1,6 @@
 package com.plcoding.chirp.api.websocket
 
-import com.fasterxml.jackson.databind.JsonMappingException
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.plcoding.chirp.api.dto.ws.ErrorDto
-import com.plcoding.chirp.api.dto.ws.IncomingWebSocketMessage
-import com.plcoding.chirp.api.dto.ws.IncomingWebSocketMessageType
-import com.plcoding.chirp.api.dto.ws.OutgoingWebSocketMessage
-import com.plcoding.chirp.api.dto.ws.OutgoingWebSocketMessageType
-import com.plcoding.chirp.api.dto.ws.SendMessageDto
+import com.plcoding.chirp.api.dto.ws.*
 import com.plcoding.chirp.api.mappers.toChatMessageDto
 import com.plcoding.chirp.domain.type.ChatId
 import com.plcoding.chirp.domain.type.UserId
@@ -17,10 +10,12 @@ import com.plcoding.chirp.service.JwtService
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
-import org.springframework.web.socket.CloseStatus
-import org.springframework.web.socket.TextMessage
-import org.springframework.web.socket.WebSocketSession
+import org.springframework.transaction.event.TransactionPhase
+import org.springframework.transaction.event.TransactionalEventListener
+import org.springframework.web.socket.*
 import org.springframework.web.socket.handler.TextWebSocketHandler
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.ObjectMapper
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
@@ -112,7 +107,7 @@ class ChatWebSocketHandler(
                     )
                 }
             }
-        } catch(e: JsonMappingException) {
+        } catch(e: JacksonException) {
             logger.warn("Could not parse message ${message.payload}", e)
             sendError(
                 session = userSession.session,
