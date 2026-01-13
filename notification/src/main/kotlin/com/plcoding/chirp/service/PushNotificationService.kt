@@ -31,7 +31,6 @@ class PushNotificationService(
             300L,
             600L
         )
-        const val MAX_RETRY_AGE_MINUTES = 30L
     }
 
     private val retryQueue = ConcurrentSkipListMap<Long, MutableList<RetryData>>()
@@ -168,12 +167,6 @@ class PushNotificationService(
 
             retries.forEach { retry ->
                 try {
-                    val age = Duration.between(retry.createdAt, now)
-                    if(age.toMinutes() > MAX_RETRY_AGE_MINUTES) {
-                        logger.warn("Dropping old retry (${age.toMinutes()} old)")
-                        return@forEach
-                    }
-
                     sendWithRetry(
                         notification = retry.notification,
                         attempt = retry.attempt
